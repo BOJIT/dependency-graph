@@ -55,6 +55,11 @@ class DependencyGraph():
         ".vscode",
     ]
 
+    # Module groups
+    base_groups = [
+
+    ]
+
     # Syntax of C/C++ include statement
     include_regex = re.compile('#include\s+["<"](.*)[">]')
 
@@ -66,13 +71,12 @@ class DependencyGraph():
     valid_sources = [['.c', '.cc', '.cpp'], 'blue']
     valid_extensions = valid_headers[0] + valid_sources[0]
 
-
     #------------------------------- Lifecycle --------------------------------#
 
     def __init__(self, root='.'):
         self._root = root
         self.blacklist = list(map(lambda f: os.path.join(self._root, f), self.base_blacklist))
-
+        self.groups = list(map(lambda f: os.path.join(self._root, f), self.base_groups))
 
     def __del__(self):
         pass
@@ -140,32 +144,56 @@ class DependencyGraph():
         Create a graph from a list of source files
         """
 
-        # Find nodes and clusters
-        folder_to_files = defaultdict(list)
-        for path in files:
-            folder_to_files[os.path.dirname(path)].append(path)
-        nodes = {filename_normalize(path) for path in files}
-
         # Create graph
         graph = Digraph(strict=strict, node_attr={'color': 'lightblue2', 'style': 'filled'})
 
+        # Find nodes and groups
+        nodes = set()
+        proxy_nodes = {}
+
+        folder_to_files = defaultdict(list)
+        for path in files:
+            folder_to_files[os.path.dirname(path)].append(path)
+
+            in_group = False
+            for group in self.groups:
+                if path.startswith(group):
+                    group_name = f"group - {filename_normalize(group)}"
+                    nodes.add(group_name)
+                    graph.node(group_name, _attributes={'color': 'lightgreen'})
+                    proxy_nodes[filename_normalize(path)] = group_name
+                    in_group = True
+
+            if not in_group:
+                nodes.add(filename_normalize(path))
+
         # Find edges
         for folder in folder_to_files:
-            for path in folder_to_files[folder]:
-                color = 'black'
-                node = filename_normalize(path)
-                ext = filename_extension(path)
-                if ext in self.valid_headers[0]:
-                    color = self.valid_headers[1]
-                if ext in self.valid_sources[0]:
-                    color = self.valid_sources[1]
 
-                graph.node(node)
+            in_group = False
+            for group in self.groups:
+                if folder.startswith(group):
+                    in_group = True
 
-                neighbors = self.find_neighbors(path)
-                for neighbor in neighbors:
-                    if neighbor != node and neighbor in nodes:
-                        graph.edge(node, neighbor, dir="back", color=color)
+            if not in_group:
+                for path in folder_to_files[folder]:
+                    color = 'black'
+                    node = filename_normalize(path)
+                    ext = filename_extension(path)
+                    if ext in self.valid_headers[0]:
+                        color = self.valid_headers[1]
+                    if ext in self.valid_sources[0]:
+                        color = self.valid_sources[1]
+
+                    graph.node(node)
+
+                    neighbors = self.find_neighbors(path)
+                    for neighbor in neighbors:
+                        if neighbor != node:
+                            if neighbor in nodes:
+                                graph.edge(node, neighbor, dir="back", color=color)
+                            elif neighbor in proxy_nodes:
+                                graph.edge(node, proxy_nodes[neighbor], dir="back", color=color)
 
         return graph
 
@@ -175,6 +203,13 @@ class DependencyGraph():
         self.base_blacklist += added_blacklist
         self.blacklist = list(map(lambda f: os.path.join(self._root, f), self.base_blacklist))
 
+        # If group is provided, append new entries
+        added_groups = [item for sublist in args['group'] for item in sublist]
+        self.base_groups += added_groups
+        self.groups = list(map(lambda f: os.path.join(self._root, f), self.base_groups))
+
+        print(self.groups)
+
         # Get all target files
         files = self.find_files(self._root)
 
@@ -183,17 +218,19 @@ class DependencyGraph():
         pprint.pprint(files)
         print("--------------------------------------")
 
-        print("Parsing files...")
-        print("--------------------------------------")
+        print("Parsing files ...")
 
         graph = self.create_graph(files, args['strict'])
         graph.format = args['format']
+
+        print("--------------------------------------")
 
         # Choose output directory
         if args['output'] != None:
             img_path = args['output']
         else:
             img_path = self.output_path + self.auto_name()
+
 
         print(f"Rendering Graph to {img_path}.{args['format']} ...")
         graph.render(img_path, cleanup=True)
@@ -220,6 +257,8 @@ def main(argv=None):
         help='Name of output file - defaults to auto-naming scheme', default=None)
     parser.add_argument('-b', '--blacklist', action='append', nargs='+',
         help='Blacklisted directories. Relative to root directory', default=[])
+    parser.add_argument('-g', '--group', action='append', nargs='+',
+        help='Directories to consider as single nodes. Relative to root directory', default=[])
 
     # Parse commands and convert to standard Python arguments
     nsargs = parser.parse_args()
