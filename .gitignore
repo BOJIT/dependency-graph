@@ -1,0 +1,22 @@
+# Image outputs
+img/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Pipenv files
+Pipfile
+Pipfile.lock
+
+# VSCode
+.vscode/settings.json
+.vscode/python.code-snippets
