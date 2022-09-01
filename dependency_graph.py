@@ -170,29 +170,35 @@ class DependencyGraph():
         # Find edges
         for folder in folder_to_files:
 
-            in_group = False
+            # Note this algorithm assumes that files can only belong to one group
+            group_name = None
             for group in self.groups:
                 if folder.startswith(group):
-                    in_group = True
+                    group_name = f"group - {filename_normalize(group)}"
 
-            if not in_group:
-                for path in folder_to_files[folder]:
-                    color = 'black'
-                    node = filename_normalize(path)
-                    ext = filename_extension(path)
-                    if ext in self.valid_headers[0]:
-                        color = self.valid_headers[1]
-                    if ext in self.valid_sources[0]:
-                        color = self.valid_sources[1]
+            # if not in_group:
+            for path in folder_to_files[folder]:
+                color = 'black'
+                node = filename_normalize(path)
+                ext = filename_extension(path)
+                if ext in self.valid_headers[0]:
+                    color = self.valid_headers[1]
+                if ext in self.valid_sources[0]:
+                    color = self.valid_sources[1]
 
+                if group_name is None:
                     graph.node(node)
+                else:
+                    node = group_name
 
-                    neighbors = self.find_neighbors(path)
-                    for neighbor in neighbors:
-                        if neighbor != node:
-                            if neighbor in nodes:
-                                graph.edge(node, neighbor, dir="back", color=color)
-                            elif neighbor in proxy_nodes:
+                neighbors = self.find_neighbors(path)
+                for neighbor in neighbors:
+                    if neighbor != node:
+                        if neighbor in nodes:
+                            graph.edge(node, neighbor, dir="back", color=color)
+                        elif neighbor in proxy_nodes:
+                            # Don't draw intra-group edges
+                            if proxy_nodes[neighbor] != node:
                                 graph.edge(node, proxy_nodes[neighbor], dir="back", color=color)
 
         return graph

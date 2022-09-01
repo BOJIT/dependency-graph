@@ -28,11 +28,21 @@ Pass the format flag to specify output image format.
 
 ```bash
 # If using Pipenv...
-pipenv run python dependency_graph.py -f svg
+pipenv run python dependency_graph.py .
 
 # ...else
-python dependency_graph.py -f svg
+python dependency_graph.py .
 ```
 
 A _red_ arrow indicates inclusion in the _header_ file (public).
 A _blue_ arrow indicates inclusion in the _source_ file (private).
+
+## Group Functionality
+
+TODO
+
+## Limitations
+
+- The system identifies nodes based on filename, not file path. Therefore every filename in your project should be unique
+
+- Nodes can only be a member of one group
